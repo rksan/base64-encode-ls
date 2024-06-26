@@ -7,38 +7,38 @@
 Notes/Domino 9.0.1 over
 
 # use
-```
+```vbs
 	Dim session As New NotesSession
 	
 	Dim fileIn As NotesStream
 	Set fileIn = session.Createstream()
 
-  '---
-  'エンコードしたいデータ(バイナリファイルでも可)
-  '---
-  Call fileIn.Open(Timer() & ".tmp", "UTF-8")
+	'---
+	'エンコードしたいデータ(バイナリファイルでも可)
+	'---
+	Call fileIn.Open(Timer() & ".tmp", "UTF-8")
 	Call fileIn.Writetext("a", EOL_NONE)
 	Call fileIn.Writetext("あ", EOL_NONE)
 	fileIn.Position = 0
 
-  '---
-  'Base64データの受け皿ストリーム
-  '---
+	'---
+	'Base64データの受け皿ストリーム
+	'---
 	Dim fileOut As NotesStream
 	Set fileOut = session.Createstream()
 
-  'Base64エンコード
+	'Base64エンコード
 	If Not EncodeBase64(fileIn, fileOut) = 0 Then
 		Error Err, Error
 	End If
 
-  '不要なので削除
+	'不要なので削除
 	Call fileIn.Truncate()
 	Call fileIn.Close()
 
-  '---
-  '以下はデバッグ用
-  '---
+	'---
+	'以下はデバッグ用
+	'---
 	Dim base64String As String
 	
 	fileOut.Position = 0
@@ -48,12 +48,14 @@ Notes/Domino 9.0.1 over
 ```
 
 # src
-```vb:base64-encode.lss
+```vbs
+Const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
 %REM
 	入力ストリームのバイナリをBase64にエンコードし、出力ストリームに書き出す
 	@param {NotesStream} fileIn 入力ストリーム。 NotesStream.Position は 0 に明示的に割り当てする必要あり
 	@param {NotesStream} fileOut 出力ストリーム。 NotesStream.Position は last に設定される
-  @return {Integer} エラーの場合、そのエラー番号
+	@return {Integer} エラーの場合、そのエラー番号
 %END REM
 Function EncodeBase64(fileIn As NotesStream, fileOut As NotesStream) As Integer
 	On Error GoTo ErrorHandle
