@@ -158,7 +158,9 @@ ErrorHandle:
 		Call base64.Open(Timer() & ".base64", "ASCII")
 		
 		Dim bit6 As String
-		
+
+		fileIn.Position = 0
+
 		Do Until fileIn.Iseos = True
 			
 			Dim chunk As Variant
@@ -219,7 +221,7 @@ ErrorHandle:
 		End If
 		
 		'The output string is less than four characters long
-		Do Until (base64.Bytes /2) Mod 4 = 0
+		Do Until (base64.Bytes) Mod 4 = 0
 			'Fill with "="
 			Call base64.Writetext("=", EOL_NONE)
 		Loop
