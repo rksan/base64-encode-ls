@@ -35,7 +35,7 @@ Sub Initialize
 	Dim fileOut As NotesStream
 	Set fileOut = session.Createstream()
 	
-	Call fileOut.Open("***.txt", "ASCII")
+	Call fileOut.Open(Timer() & ".txt", "ASCII")
 	
 	If Not base64.Export(Fileout) = 0 Then
 		Error Err, Error
@@ -62,7 +62,7 @@ Sub Initialize
 	
 	'デコードしたいBase64テキスト
 	Set stream = ss.Createstream()
-	Call stream.open("***.txt", "ASCII")
+	Call stream.open(Timer() & ".txt", "ASCII")
 	Call stream.Writetext("YQ==", EOL_NONE) 'YQ== -> a
 	
 	'デコード
@@ -73,7 +73,7 @@ Sub Initialize
 	
 	'エクスポート
 	Set stream = ss.Createstream()
-	Call stream.open("***.txt", "UTF-8")
+	Call stream.open(Timer() & ".txt", "UTF-8")
 	
 	If not base64.Export(stream) = 0 Then
 		Error Err, Error
@@ -96,6 +96,10 @@ Class CBase64
 	
 	Sub New()
 		Me.zBufferLlength = 255
+		'--
+		Me.zLineLength = 0
+		Me.zEOL = EOL_NONE
+		Me.zPadding = "="
 	End Sub
 	
 	Sub Delete()
@@ -104,6 +108,39 @@ Class CBase64
 			Call Me.zFileOut.Close()
 		End If
 	End Sub
+	
+	'@param {Long} LineLength
+	' (default) 0
+	' exp. 76
+	Property Set LineLength As Long
+		Me.zLineLength = LineLength
+		If Not Me.zLineLength = 0 Then
+			If Me.zEOL = EOL_NONE Then
+				Me.zEOL = EOL_CRLF
+			End If
+		Else
+			Me.zEOL = EOL_NONE
+		End If
+	End Property
+	
+	'@see https://help.hcltechsw.com/dom_designer/9.0.1/appdev/H_WRITETEXT_METHOD_STREAM.html
+	'@param {Long} EOL
+	' (default) EOL_NONE
+	' exp. EOL_CR_LF
+	Property Set EOL As Long
+		Me.zEOL = EOL
+		If Not Me.zEOL = EOL_NONE Then
+			Me.zLineLength = 76
+		Else
+			Me.zLineLength = 0
+		End If
+	End Property
+	
+	'@param {String} Padding
+	' (default) =
+	Property Set Padding As String
+		Me.zPadding = Padding
+	End Property
 	
 	'Returns the stored data as text.
 	'@return {String}
@@ -143,6 +180,7 @@ ErrorHandle:
 	End Function
 	
 	' Text or Binary -> Base64
+	'@see https://tex2e.github.io/rfc-translater/html/rfc4648.html
 	'@param {NotesStream} fileIn
 	'	Data stream to encode. text or binary.
 	'@return {Integer}
@@ -158,9 +196,10 @@ ErrorHandle:
 		Call base64.Open(Timer() & ".base64", "ASCII")
 		
 		Dim bit6 As String
-
+		Dim charCount As Long
+		
 		fileIn.Position = 0
-
+		
 		Do Until fileIn.Iseos = True
 			
 			Dim chunk As Variant
@@ -193,6 +232,12 @@ ErrorHandle:
 						'add stream
 						Call base64.Writetext(char, EOL_NONE)
 						
+						charCount = charCount + 1
+						If charCount = Me.zLineLength Then
+							Call base64.Writetext("", Me.zEOL)
+							charCount = 0
+						End If
+						
 						'Clear after processing
 						bit6 = ""
 					End If
@@ -216,15 +261,29 @@ ErrorHandle:
 			'add stream
 			Call base64.Writetext(char, EOL_NONE)
 			
+			charCount = charCount + 1
+			If charCount = Me.zLineLength Then
+				Call base64.Writetext("", Me.zEOL)
+				charCount = 0
+			End If
+			
 			'Clear after processing
 			bit6 = ""
 		End If
 		
 		'The output string is less than four characters long
-		Do Until (base64.Bytes) Mod 4 = 0
-			'Fill with "="
-			Call base64.Writetext("=", EOL_NONE)
-		Loop
+		If Not Me.zPadding = "" Then
+			Do Until (base64.Bytes) Mod 4 = 0
+				'Fill with "="
+				Call base64.Writetext(Me.zPadding, EOL_NONE)
+				
+				charCount = charCount + 1
+				If charCount = Me.zLineLength Then
+					Call base64.Writetext("", Me.zEOL)
+					charCount = 0
+				End If
+			Loop
+		End If
 		
 		base64.Position = 0
 		
@@ -247,6 +306,9 @@ ErrorHandle:
 		Dim ss As New NotesSession
 		Dim stream As NotesStream
 		
+		Dim base64Char As String
+		base64Char = Me.zBase64Char
+		
 		'All processed as binary data
 		Set stream = ss.Createstream()
 		Call stream.Open(Timer() & ".tmp", "binary")
@@ -263,13 +325,9 @@ ErrorHandle:
 				char = Mid(buffer, 1, 1)
 				buffer = Mid(buffer, 2)
 				
-				If char = "=" Then
-					GoTo NextChar
-				End If
-				
 				'char -> byte
 				Dim p As Byte
-				p = InStr(1, Me.zBase64Char, char, 0)
+				p = InStr(1, base64Char, char, 0)
 				
 				If p = 0 Then
 					GoTo NextChar
@@ -318,6 +376,10 @@ ErrorHandle:
 	Private zFileOut As NotesStream
 	Private zBufferLlength As Long
 	
+	Private zLineLength As Long
+	Private zEOL As Long
+	Private zPadding As String
+	
 	Private Property Get zBase64Char As String
 		zBase64Char = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 	End Property
@@ -352,6 +414,7 @@ ErrorHandle:
 		zBit6ToChar = Err
 		Exit Function
 	End Function
+	
 	
 End Class
 ```
